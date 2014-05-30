@@ -117,6 +117,9 @@
 
 -(BOOL)textField:(UITextField *)textField shouldChangeCharactersInRange:(NSRange)range replacementString:(NSString *)string
 {
+    if (textField == self.itemField) {
+        return YES;
+    }
     NSString *replaced = [textField.text stringByReplacingCharactersInRange:range withString:string];
     NSDecimalNumber *amount = (NSDecimalNumber*) [self.currencyFormatter numberFromString:replaced];
     if (amount == nil) {
@@ -150,8 +153,12 @@
 }
 
 - (IBAction)sendItemPayment {
+    
     AFHTTPRequestOperationManager *manager = [AFHTTPRequestOperationManager manager];
 
+    manager.requestSerializer = [AFJSONRequestSerializer serializer];
+    [manager.requestSerializer setValue:@"application/json" forHTTPHeaderField:@"Content-Type"];
+    
     NSMutableArray *buyinUsernames = [[NSMutableArray alloc] init];
     for (NSDictionary *d in [self.buyins allObjects]) {
         [buyinUsernames addObject:[d objectForKey:@"username"]];
@@ -167,6 +174,12 @@
     } failure:^(AFHTTPRequestOperation *operation, NSError *error) {
         NSLog(@"Error: %@", error);
     }];
+    self.itemField.text = @"";
+    self.costField.text = @"";
+    for (int i = 0; i < [self.personTable numberOfRowsInSection:0]; i++) {
+        [self.personTable deselectRowAtIndexPath:[NSIndexPath indexPathForRow:i inSection:0] animated:YES];
+    }
+    [self.buyins removeAllObjects];
 }
 
 - (void)reloadPayerButtonText {
@@ -178,6 +191,17 @@
     }
 }
 
+- (void)resignOnTap:(id)iSender {
+    [[self view] endEditing:YES];
+}
+
+-(BOOL) textFieldShouldReturn: (UITextField *) textField {
+    if (textField == self.itemField) {
+        [self.costField becomeFirstResponder];
+    }
+    return YES;
+}
+
 - (void)viewDidLoad
 {
     [super viewDidLoad];
@@ -186,11 +210,17 @@
     [self reloadPayerButtonText];
     
     [self.costField setDelegate:self];
+    [self.itemField setDelegate:self];
     
     [self.personTable setDelegate:self];
     [self.personTable setDataSource:self];
     [self.personTable setAllowsMultipleSelection:YES];
     
+    UITapGestureRecognizer *singleTap = [[UITapGestureRecognizer alloc] initWithTarget:self action:@selector(resignOnTap:)];
+    [singleTap setNumberOfTapsRequired:1];
+    [singleTap setNumberOfTouchesRequired:1];
+    [singleTap setCancelsTouchesInView:NO];
+    [self.view addGestureRecognizer:singleTap];
     
     AFHTTPRequestOperationManager *manager = [AFHTTPRequestOperationManager manager];
     [manager GET:@"http://ec2-54-194-186-121.eu-west-1.compute.amazonaws.com:9000/users/" parameters:nil success:^(AFHTTPRequestOperation *operation, id responseObject) {
